@@ -260,16 +260,16 @@ $fileGroups = @(New-CBArraySplit $monitoredExtensions)
 Write-Host "`n####"
 Write-Host "Adding/replacing File Groups.."
 ForEach ($group in $fileGroups) {
-    #Write-Host "Adding/replacing File Group [$($group.fileGroupName)] with monitored file [$($group.array -Join ",")].."
+   # Write-Host "Adding/replacing File Group [$($group.fileGroupName)] with monitored file [$($group.array -Join ",")].."
     Write-Host "`nFile Group [$($group.fileGroupName)] with monitored files from [$($group.array[0])] to [$($group.array[$group.array.GetUpperBound(0)])].."
-	Remove-FsrmFileGroup -Name "$($group.fileGroupName)" -ErrorAction:SilentlyContinue
-    New-FsrmFileGroup -Name "$($group.fileGroupName)" -IncludePattern "$($group.array -Join '|')"
+	Remove-FsrmFileGroup -Name "$($group.fileGroupName)" -Confirm:$false
+    New-FsrmFileGroup -Name "$($group.fileGroupName)" -IncludePattern @($group.array)
 }
 
 # Create File Screen Template with Notification
 Write-Host "`n####"
 Write-Host "Adding/replacing [$fileTemplateType] File Screen Template [$fileTemplateName] with eMail Notification [$EmailNotification] and Event Notification [$EventNotification].."
-&filescrn.exe Template Delete /Template:$fileTemplateName /Quiet
+Remove-FsrmFileScreenTemplate -Name "$fileTemplateName" -Confirm:$false
 # Build the argument list with all required fileGroups and notifications
 $screenArgs = 'Template', 'Add', "/Template:$fileTemplateName", "/Type:$fileTemplateType"
 ForEach ($group in $fileGroups) {
