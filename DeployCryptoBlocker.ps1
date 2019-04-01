@@ -1,5 +1,6 @@
 # DeployCryptoBlocker.ps1
 # Version: 1.1
+# Changed from nexxai/CryptoBlocker to support PowerShell FSRM commands replacing deprecated filescrn.exe
 #####
 
 ################################ USER CONFIGURATION ################################
@@ -51,7 +52,7 @@ Function ConvertFrom-Json20
 Function New-CBArraySplit
 {
     <# 
-        Takes an array of file extensions and checks if they would make a string >4Kb, 
+        Takes an array of file extensions and checks if they would make a string >1Kb, 
         if so, turns it into several arrays
     #>
     param(
@@ -64,19 +65,17 @@ Function New-CBArraySplit
     $WorkingArrayIndex = 1
     $LengthOfStringsInWorkingArray = 0
 
-    # TODO - is the FSRM limit for bytes or characters?
-    #        maybe [System.Text.Encoding]::UTF8.GetBytes($_).Count instead?
-    #        -> in case extensions have Unicode characters in them
-    #        and the character Length is <4Kb but the byte count is >4Kb
+    # FileServerResourceManager commandlets support maximum of 1KB Include/Exclude Patterns
+    # Build small enough arrays to fit into command
 
     # Take the items from the input array and build up a 
     # temporary workingarray, tracking the length of the items in it and future commas
     $Extensions | ForEach-Object {
 
-        if (($LengthOfStringsInWorkingArray + 1 + $_.Length) -gt 4000) 
+        if (($LengthOfStringsInWorkingArray + 1 + $_.Length) -gt 1000) 
         {   
             # Adding this item to the working array (with +1 for a comma)
-            # pushes the contents past the 4Kb limit
+            # pushes the contents past the 1KB limit
             # so output the workingArray
             [PSCustomObject]@{
                 index = $WorkingArrayIndex
@@ -97,7 +96,7 @@ Function New-CBArraySplit
         }
     }
 
-    # The last / only workingArray won't have anything to push it past 4Kb
+    # The last / only workingArray won't have anything to push it past 1Kb
     # and trigger outputting it, so output that one as well
     [PSCustomObject]@{
         index = ($WorkingArrayIndex)
@@ -157,22 +156,10 @@ if ($majorVer -ge 6)
 	}
 	
     }
-    elseif ($checkFSRM.Installed -ne "True")
-    {
-        # Server 2008
-        Write-Host "`n####"
-		Write-Host "FSRM not found.. Installing (2008).."
-        $install = &servermanagercmd -Install FS-FileServer FS-Resource-Manager
-	if ($? -ne $True)
-	{
-		Write-Host "Install of FSRM failed."
-		exit
-	}
-    }
 }
 else
 {
-    # Assume Server 2003
+    # Assume Server 2003/2008
     Write-Host "`n####"
 	Write-Host "Unsupported version of Windows detected! Quitting.."
     return
@@ -191,6 +178,7 @@ if (Test-Path $PSScriptRoot\ProtectList.txt)
 {
     $drivesContainingShares = Get-Content $PSScriptRoot\ProtectList.txt | ForEach-Object { $_.Trim() }
 }
+#If ProtectList not found, look for all shared folders
 Else {
     $drivesContainingShares =   @(Get-WmiObject Win32_Share | 
                     Select Name,Path,Type | 
@@ -265,17 +253,17 @@ If (Test-Path $PSScriptRoot\IncludeList.txt)
     $monitoredExtensions = $monitoredExtensions + $includeExt
 }
 
-# Split the $monitoredExtensions array into fileGroups of less than 4kb to allow processing by filescrn.exe
+# Split the $monitoredExtensions array into fileGroups of less than 1KB to allow processing by filescrn.exe
 $fileGroups = @(New-CBArraySplit $monitoredExtensions)
 
-# Perform these steps for each of the 4KB limit split fileGroups
+# Perform these steps for each of the 1KB limit split fileGroups
 Write-Host "`n####"
 Write-Host "Adding/replacing File Groups.."
 ForEach ($group in $fileGroups) {
     #Write-Host "Adding/replacing File Group [$($group.fileGroupName)] with monitored file [$($group.array -Join ",")].."
     Write-Host "`nFile Group [$($group.fileGroupName)] with monitored files from [$($group.array[0])] to [$($group.array[$group.array.GetUpperBound(0)])].."
-	&filescrn.exe filegroup Delete "/Filegroup:$($group.fileGroupName)" /Quiet
-    &filescrn.exe Filegroup Add "/Filegroup:$($group.fileGroupName)" "/Members:$($group.array -Join '|')"
+	Remove-FsrmFileGroup -Name "$($group.fileGroupName)" -ErrorAction:SilentlyContinue
+    New-FsrmFileGroup -Name "$($group.fileGroupName)" -IncludePattern "$($group.array -Join '|')"
 }
 
 # Create File Screen Template with Notification
