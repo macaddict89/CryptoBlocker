@@ -269,24 +269,37 @@ ForEach ($group in $fileGroups) {
 
 # Create File Screen Template with Notification
 Write-Host "`n####"
-Write-Host "Adding/replacing [$fileTemplateType] File Screen Template [$fileTemplateName] with eMail Notification and Event Notification ..."
+Write-Host "Adding/replacing [$fileTemplateType] File Screen Template [$fileTemplateName]..."
 Remove-FsrmFileScreenTemplate -Name "$fileTemplateName" -Confirm:$false
 #Create Mail Notification Action if we have a to variable
+if ($fileTemplateType -eq "Active"){
+    New-FsrmFileScreenTemplate -Name $fileTemplateName -Active -IncludeGroup @($fileGroupNames)
+}
+else {
+    New-FsrmFileScreenTemplate -Name $fileTemplateName -IncludeGroup @($fileGroupNames)
+}
 if ($mTo -ne ""){
-    $mNotification = New-FsrmAction -Type Email -MailTo $mTo -Subject $mSubject -Body $mBody -RunLimitInterval $aRunLimitInt
+    $mNotification = ""New-FsrmAction -Type Email -MailTo $mTo -Subject $mSubject -Body $mBody -RunLimitInterval $aRunLimitInt
 }
 if ($eEventType -ne ""){
     $eNotification = New-FsrmAction -Type Event -EventType $eEventType -Body $eBody -RunLimitInterval $aRunLimitInt
 }
-##TODO: Better notification exemptions if no notifications. Causing errors without the notifications being created.
-if ($fileTemplateType -eq "Active"){
-    New-FsrmFileScreenTemplate -Name $fileTemplateName -Active -IncludeGroup @($fileGroupNames) -Notification ($mNotification,$eNotification)
-    $fileTemplateName
-    $fileGroupNames
+#Build an overly complicated nested if to build the -Notification Parameter and have it fail
+if ($mNotification -ne "" -or $eNotification -ne ""){
+    if ($mNotification -ne "" -and $eNotification -eq ""){
+        Write-Host "Setting eMail Notification for [$fileTemplateName]..."
+        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $mNotification
+    }
+    elseif ($mNotification -eq "" -and $eNotification -ne ""){
+        Write-Host "Setting Event Notification for [$fileTemplateName]..."
+        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $eNotification
+    }
+    else {
+        Write-Host "Setting eMail and Event Notification for [$fileTemplateName]..."
+        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification ($mNotification,$eNotification)
+    }
 }
-else {
-    New-FsrmFileScreenTemplate -Name "$fileTemplateName" -IncludeGroup @($fileGroupNames) -Notification @($mNotification,$eNotification)
-}
+
 
 # Create File Screens for every drive containing shares
 Write-Host "`n####"
