@@ -14,14 +14,16 @@ $fileTemplateType = "Active"
 # Passive screening: Allow users to save unathorized files (use for monitoring)
 #$fileTemplateType = "Passive"
 
-##TODO: Parameterize it to ignore if no message set
-# Write the email options - comment out the entire block if no email notification should be set
+
+# Email options - set SendMail to false if no email notification should be set
+$SendMail = $true
 $mTo="[Admin Email]" 
 ## Email Subject and Message
 $mSubject="Unauthorized file from the [Violated File Group] file group detected"
 $mBody="User [Source Io Owner] attempted to save [Source File Path] to [File Screen Path] on the [Server] server. This file is in the [Violated File Group] file group, which is not permitted on the server."
 
-# Write the event log options - comment out the entire block if no event notification should be set
+# Write the event log options - Set SendEvent to false if no event notification should be set
+$SendEvent = $true
 $eEventType="Warning"
 ## Eventlog Message
 $eBody="User [Source Io Owner] attempted to save [Source File Path] to [File Screen Path] on the [Server] server. This file is in the [Violated File Group] file group, which is not permitted on the server."
@@ -278,25 +280,28 @@ if ($fileTemplateType -eq "Active"){
 else {
     New-FsrmFileScreenTemplate -Name $fileTemplateName -IncludeGroup @($fileGroupNames)
 }
-if ($mTo -ne ""){
-    $mNotification = ""New-FsrmAction -Type Email -MailTo $mTo -Subject $mSubject -Body $mBody -RunLimitInterval $aRunLimitInt
-}
-if ($eEventType -ne ""){
-    $eNotification = New-FsrmAction -Type Event -EventType $eEventType -Body $eBody -RunLimitInterval $aRunLimitInt
-}
-#Build an overly complicated nested if to build the -Notification Parameter and have it fail
-if ($mNotification -ne "" -or $eNotification -ne ""){
-    if ($mNotification -ne "" -and $eNotification -eq ""){
-        Write-Host "Setting eMail Notification for [$fileTemplateName]..."
-        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $mNotification
+#Build and Set Notifications if Enabled
+if ($SendMail -eq $true -or $SendEvent -eq $true){
+    if ($SendMail -eq $true){
+        $mNotification = New-FsrmAction -Type Email -MailTo $mTo -Subject $mSubject -Body $mBody -RunLimitInterval $aRunLimitInt
     }
-    elseif ($mNotification -eq "" -and $eNotification -ne ""){
-        Write-Host "Setting Event Notification for [$fileTemplateName]..."
-        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $eNotification
+    if ($SendEvent -eq $true){
+        $eNotification = New-FsrmAction -Type Event -EventType $eEventType -Body $eBody -RunLimitInterval $aRunLimitInt
     }
-    else {
-        Write-Host "Setting eMail and Event Notification for [$fileTemplateName]..."
-        Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification ($mNotification,$eNotification)
+    #Build an overly complicated nested if to build the -Notification Parameter and have it fail
+    if ($mNotification -ne "" -or $eNotification -ne ""){
+        if ($mNotification -ne "" -and $eNotification -eq ""){
+            Write-Host "Setting eMail Notification for [$fileTemplateName]..."
+            Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $mNotification
+        }
+        elseif ($mNotification -eq "" -and $eNotification -ne ""){
+            Write-Host "Setting Event Notification for [$fileTemplateName]..."
+            Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification $eNotification
+        }
+        else {
+            Write-Host "Setting eMail and Event Notification for [$fileTemplateName]..."
+            Set-FsrmFileScreenTemplate -Name $fileTemplateName -Notification ($mNotification,$eNotification)
+        }
     }
 }
 
