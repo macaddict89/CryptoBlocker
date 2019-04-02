@@ -273,12 +273,14 @@ ForEach ($group in $fileGroups) {
 Write-Host "`n####"
 Write-Host "Adding/replacing [$fileTemplateType] File Screen Template [$fileTemplateName]..."
 Remove-FsrmFileScreenTemplate -Name "$fileTemplateName" -Confirm:$false
-#Create Mail Notification Action if we have a to variable
+#Create File Screen Template with all File Groups included
 if ($fileTemplateType -eq "Active"){
+    Write-Host "Active"
     New-FsrmFileScreenTemplate -Name $fileTemplateName -Active -IncludeGroup @($fileGroupNames)
 }
 else {
-    New-FsrmFileScreenTemplate -Name $fileTemplateName -IncludeGroup @($fileGroupNames)
+    Write-Host "Passive"
+    New-FsrmFileScreenTemplate -Name $fileTemplateName -Active:$false -IncludeGroup @($fileGroupNames)
 }
 #Build and Set Notifications if Enabled
 if ($SendMail -eq $true -or $SendEvent -eq $true){
