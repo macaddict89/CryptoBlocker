@@ -328,7 +328,8 @@ if (Test-Path .\ExcludePaths.txt)
 If (Test-Path $PSScriptRoot\ExcludePaths.txt) {
     Get-Content $PSScriptRoot\ExcludePaths.txt | ForEach-Object {
         If (Test-Path $_) {
-            New-FsrmFileScreenException -Path "$_" -IncludeGroup @($fileGroupNames)
+            Remove-FsrmFileScreenException -Path "$_" -Confirm:$false
+	    New-FsrmFileScreenException -Path "$_" -IncludeGroup @($fileGroupNames)
         }
     }
 }
